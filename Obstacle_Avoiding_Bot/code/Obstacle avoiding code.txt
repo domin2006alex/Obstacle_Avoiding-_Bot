@@ -1,0 +1,168 @@
+#include <AFMotor.h>
+#include <Servo.h>
+
+// ---------- PIN DEFINITIONS ----------
+#define Echo A0
+#define Trig A1
+#define ServoPin 10
+
+// ---------- CONSTANTS ----------
+#define Speed 180
+#define ObstacleThreshold 20
+#define TurnDelay 1000   // increased for stronger turning
+#define BackwardDelay 600
+
+// ---------- VARIABLES ----------
+int distance;
+Servo myServo;
+
+// ---------- MOTOR SETUP ----------
+AF_DCMotor M1(1); // Left Front
+AF_DCMotor M2(2); // Left Back
+AF_DCMotor M3(3); // Right Front
+AF_DCMotor M4(4); // Right Back
+
+// ---------- SETUP ----------
+void setup() {
+  Serial.begin(9600);
+  pinMode(Trig, OUTPUT);
+  pinMode(Echo, INPUT);
+
+  myServo.attach(ServoPin);
+  myServo.write(90); // center
+  delay(1000);
+
+  M1.setSpeed(Speed);
+  M2.setSpeed(Speed);
+  M3.setSpeed(Speed);
+  M4.setSpeed(Speed);
+
+  Serial.println("Robot Ready!");
+}
+
+// ---------- MAIN LOOP ----------
+void loop() {
+  distance = ultrasonic();
+
+  Serial.print("Distance: ");
+  Serial.println(distance);
+
+  if (distance <= ObstacleThreshold) {
+    Stop();
+    delay(100);
+
+    backward();
+    delay(BackwardDelay);
+    Stop();
+    delay(100);
+
+    // Scan both directions
+    int rightDistance = lookRight();
+    delay(300);
+    int leftDistance = lookLeft();
+    delay(300);
+
+    myServo.write(90); // center
+    delay(200);
+
+    if (rightDistance > leftDistance) {
+      turnRight();
+      delay(TurnDelay);
+    } else {
+      turnLeft();
+      delay(TurnDelay);
+    }
+
+    Stop();
+    delay(200);
+  } 
+  else {
+    forward();
+  }
+}
+
+// ---------- ULTRASONIC FUNCTION ----------
+int ultrasonic() {
+  digitalWrite(Trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(Trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(Trig, LOW);
+
+  long duration = pulseIn(Echo, HIGH, 30000);
+  if (duration == 0) return 999;
+  int cm = duration * 0.034 / 2;
+  return cm;
+}
+
+// ---------- MOVEMENT FUNCTIONS ----------
+void forward() {
+  M1.run(FORWARD);
+  M2.run(FORWARD);
+  M3.run(BACKWARD);
+  M4.run(BACKWARD);
+  Serial.println("Moving forward...");
+}
+
+void backward() {
+  M1.run(BACKWARD);
+  M2.run(BACKWARD);
+  M3.run(FORWARD);
+  M4.run(FORWARD);
+  Serial.println("Moving backward...");
+}
+
+// --- Version A: Normal turning ---
+void turnLeft() {
+  M1.run(BACKWARD);
+  M2.run(BACKWARD);
+  M3.run(BACKWARD);
+  M4.run(BACKWARD);
+  Serial.println("Turning left...");
+}
+
+void turnRight() {
+  M1.run(FORWARD);
+  M2.run(FORWARD);
+  M3.run(FORWARD);
+  M4.run(FORWARD);
+  Serial.println("Turning right...");
+}
+
+// --- Version B (swap if A doesn’t rotate properly) ---
+// void turnLeft() {
+//   M1.run(BACKWARD);
+//   M2.run(BACKWARD);
+//   M3.run(FORWARD);
+//   M4.run(FORWARD);
+//   Serial.println("Turning left...");
+// }
+
+// void turnRight() {
+//   M1.run(FORWARD);
+//   M2.run(FORWARD);
+//   M3.run(BACKWARD);
+//   M4.run(BACKWARD);
+//   Serial.println("Turning right...");
+// }
+
+void Stop() {
+  M1.run(RELEASE);
+  M2.run(RELEASE);
+  M3.run(RELEASE);
+  M4.run(RELEASE);
+  Serial.println("Stopped.");
+}
+
+// ---------- SERVO SCAN FUNCTIONS ----------
+int lookRight() {
+  myServo.write(30);
+  delay(500);
+  return ultrasonic();
+}
+
+int lookLeft() {
+  myServo.write(150);
+  delay(500);
+  return ultrasonic();
+}
